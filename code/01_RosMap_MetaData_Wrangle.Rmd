@@ -463,13 +463,15 @@ Toss[ dim(Toss)[1], ]$Projid <- METADATA[ METADATA$sampleID == FILT[ FILT$UTY < 
 Toss[ dim(Toss)[1], ]$Projid.Sex <- 1
 Toss[ dim(Toss)[1], ]$tissue <- as.character( Total_Meta[ Total_Meta$specimenID == METADATA[ METADATA$sampleID == FILT[ FILT$UTY < 4 & FILT$`Reported Gender` == 'male' ,]$sampleID,]$sampleID, ]$tissue )
 
-thisRepo <- githubr::getRepo(repository = "jgockley62/RosMap_RNASeq", ref="branch", refName='master')
+thisFileName <- '01_RosMap_MetaData_Wrangle.Rmd'
+thisRepo <- githubr:s:getRepo(repository = "jgockley62/RosMap_RNASeq", ref="branch", refName='master')
 thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath=paste0('code/',thisFileName))
 
 write.csv( Toss,'/home/jgockley/sageseqr/SampleSwaps.csv', row.names = F )
 activity <- Activity(
     'Sample Swap Issues',
     description='samples to exclude due to not matching patient',
+    executed= thisFile, 
     used=c('syn22355545',"syn22314230","syn22301601","syn22283382","syn22283384","syn22301603","syn22314232","syn3191087",'syn21323366','syn21088596'))
 file <- File('/home/jgockley/sageseqr/SampleSwaps.csv', description='Sample Swap Info', parent='syn23569327')
 file <- synStore(file, activity=activity)
@@ -555,6 +557,7 @@ write.csv( Meta_Final, '~/sageseqr/RosMap_RNASeq_Meta_Master.csv', row.names = F
 activity <- Activity(
     'RosMap RNASeq Master With Ages Over 90',
     description='Total RNASeq Meta Data for RosMap RNASeq',
+    executed= thisFile,  
     used=c('syn22355545',"syn22314230","syn22301601","syn22283382","syn22283384","syn22301603","syn22314232","syn3191087",'syn21323366','syn21088596'))
 file <- File('~/sageseqr/RosMap_RNASeq_Meta_Master.csv', description='RosMap RNASeq MetaData', parent='syn23569327')
 file <- synStore(file, activity=activity)
