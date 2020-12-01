@@ -463,7 +463,8 @@ Toss[ dim(Toss)[1], ]$Projid <- METADATA[ METADATA$sampleID == FILT[ FILT$UTY < 
 Toss[ dim(Toss)[1], ]$Projid.Sex <- 1
 Toss[ dim(Toss)[1], ]$tissue <- as.character( Total_Meta[ Total_Meta$specimenID == METADATA[ METADATA$sampleID == FILT[ FILT$UTY < 4 & FILT$`Reported Gender` == 'male' ,]$sampleID,]$sampleID, ]$tissue )
 
-
+thisRepo <- githubr::getRepo(repository = "jgockley62/RosMap_RNASeq", ref="branch", refName='master')
+thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath=paste0('code/',thisFileName))
 
 write.csv( Toss,'/home/jgockley/sageseqr/SampleSwaps.csv', row.names = F )
 activity <- Activity(
