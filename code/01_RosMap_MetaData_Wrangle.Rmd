@@ -567,3 +567,47 @@ file <- synStore(file, activity=activity)
 file <- File('RosMap_RNASeq_Meta_Master.csv', description='RosMap RNASeq MetaData', executed = thisFile, parent='syn23573926')
 file <- synStore(file, activity=activity)
 
+
+####### Combine the counts across data cuts
+
+#Get Count Data
+Ros_DC1 <- get_data( 'syn22283382' )[-c(1:4),] %>%
+    tibble::column_to_rownames(var = "feature") %>%
+    t() %>%
+    as.data.frame() %>%
+    tibble::rownames_to_column(var = "sample") %>%
+    tibble::column_to_rownames(var = "sample") %>%
+    t()
+
+Ros_DC2 <- get_data( 'syn22301601' )[-c(1:4),] %>%
+    tibble::column_to_rownames(var = "feature") %>%
+    t() %>%
+    as.data.frame() %>%
+    tibble::rownames_to_column(var = "sample") %>%
+    tibble::column_to_rownames(var = "sample") %>%
+    t() 
+
+Ros_DC3 <- get_data( 'syn22314230' )[-c(1:4),] %>%
+    tibble::column_to_rownames(var = "feature") %>%
+    t() %>%
+    as.data.frame() %>%
+    tibble::rownames_to_column(var = "sample") %>%
+    tibble::column_to_rownames(var = "sample") %>%
+    t()
+
+   t()
+
+total_counts <- cbind( Ros_DC1, Ros_DC2, Ros_DC3 )
+
+total_counts <- cbind( feature=row.names(total_counts), total_counts)
+
+
+write.table( total_counts, 'RosMap_totalcounts.txt', row.names = F, col.names = T, sep='\t', quote=F )
+activity <- Activity(
+    'RosMap Counts',
+    description='All three Data cuts of the RosMap Data',
+    executed = thisFile,
+    used=c('syn22314230','syn22301601','syn22283382'))
+file <- File('RosMap_totalcounts.txt', description='RosMap Counts', executed = thisFile, parent='syn23573926')
+file <- synStore(file, activity=activity)
+
