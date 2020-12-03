@@ -9,3 +9,4 @@ remotes::install_github("GabrielHoffman/mvIC")
 remotes::install_github("Sage-Bionetworks/sageseqr")
 
 devtools::install_github("brian-bot/githubr")
+BiocManager::install(version = "3.12")
