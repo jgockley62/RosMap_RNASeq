@@ -478,7 +478,6 @@ activity <- Activity(
 file <- File('SampleSwaps.csv', description='Sample Swap Info', parent='syn23569327')
 file <- synStore(file, activity=activity)
 
-
 sink_metadata <- metadata 
 sink_Total_Meta <- Total_Meta
 
