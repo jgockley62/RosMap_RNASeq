@@ -316,9 +316,9 @@ COUNT <- COUNT[ , colnames(COUNT) != 'ensembl_gene_id' ]
 #COUNT <- COUNT[ grepl('ENSG', row.names(COUNT)), ]
 
 library(biomaRt)
-#ensembl_gene_id	hgnc_symbol	percentage_gene_gc_content	gene_biotype	chromosome_name	gene_length
+#ensembl_gene_id  hgnc_symbol percentage_gene_gc_content  gene_biotype  chromosome_name gene_length
 mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl"))
-biomart_results <- getBM(filters= "ensembl_gene_id", attributes= c('ensembl_gene_id',	'hgnc_symbol',	'percentage_gene_gc_content',	'gene_biotype',	'chromosome_name',	"transcript_length"),values=c( "ENSG00000229807", 'ENSG00000183878' ), mart= mart)
+biomart_results <- getBM(filters= "ensembl_gene_id", attributes= c('ensembl_gene_id', 'hgnc_symbol',  'percentage_gene_gc_content', 'gene_biotype', 'chromosome_name',  "transcript_length"),values=c( "ENSG00000229807", 'ENSG00000183878' ), mart= mart)
 
 foo <- biomart_results[ biomart_results[ biomart_results$hgnc_symbol == 'XIST',]$transcript_length == max( biomart_results[biomart_results$hgnc_symbol == 'XIST',]$transcript_length), ]
 biomart <- foo[ foo$chromosome_name == 'X', ]
@@ -463,17 +463,19 @@ Toss[ dim(Toss)[1], ]$Projid <- METADATA[ METADATA$sampleID == FILT[ FILT$UTY < 
 Toss[ dim(Toss)[1], ]$Projid.Sex <- 1
 Toss[ dim(Toss)[1], ]$tissue <- as.character( Total_Meta[ Total_Meta$specimenID == METADATA[ METADATA$sampleID == FILT[ FILT$UTY < 4 & FILT$`Reported Gender` == 'male' ,]$sampleID,]$sampleID, ]$tissue )
 
+
 thisFileName <- '01_RosMap_MetaData_Wrangle.Rmd'
-thisRepo <- githubr:s:getRepo(repository = "jgockley62/RosMap_RNASeq", ref="branch", refName='master')
+# Github link
+thisRepo <- githubr::getRepo(repository = "jgockley62/RosMap_RNASeq", ref="branch", refName='master')
 thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath=paste0('code/',thisFileName))
 
-write.csv( Toss,'/home/jgockley/sageseqr/SampleSwaps.csv', row.names = F )
+write.csv( Toss,'SampleSwaps.csv', row.names = F )
 activity <- Activity(
     'Sample Swap Issues',
+    executed = thisFile,
     description='samples to exclude due to not matching patient',
-    executed= thisFile, 
     used=c('syn22355545',"syn22314230","syn22301601","syn22283382","syn22283384","syn22301603","syn22314232","syn3191087",'syn21323366','syn21088596'))
-file <- File('/home/jgockley/sageseqr/SampleSwaps.csv', description='Sample Swap Info', parent='syn23569327')
+file <- File('SampleSwaps.csv', description='Sample Swap Info', parent='syn23569327')
 file <- synStore(file, activity=activity)
 
 
@@ -502,7 +504,7 @@ Meta_Final[ Meta_Final$specimenID %in% Toss$SageID, ]$FailQC_SampleSwapped <- 1
 #Fix IDs with trimmed Zeros
 table( sapply(Meta_Final$projid[!duplicated(Meta_Final$projid)], nchar) )
 Meta_Final$projid_repaired <- stringr::str_pad(Meta_Final$projid, 8, side = "left", pad = 0)
-table( sapply(FOO[!duplicated(FOO)], nchar) )
+#table( sapply(FOO[!duplicated(FOO)], nchar) )
 
 
 ORD <- c( "specimenID", "sampleid", "sample", "individualID", "individualid", "projid", "projid_repaired", "Study", "study", "sequencingBatch", "notes", "batch", "apoe_genotype", "apoe4", "pmi", "rincontinuous", "rin2", "RIN",  "FailQC_SampleSwapped", "readStrandOrigin", "readstrandorigin", "readLength", "readlength", "platform", "libraryPrep", "libraryPreparationMethod","librarypreparationmethod", "libraryprep", "tissue", "diagnosis", "msex", "sex", "educ", "race", "spanish", "age_at_visit_max", "age_first_ad_dx", "age_death", "cts_mmse30_first_ad_dx", "cts_mmse30_lv", "braaksc", "ceradsc", "cogdx", "dcfdx_lv", "AlignmentSummaryMetrics__BAD_CYCLES", "bad_cycles", "AlignmentSummaryMetrics__CATEGORY", "category", "AlignmentSummaryMetrics__MEAN_READ_LENGTH", "mean_read_length", "AlignmentSummaryMetrics__PCT_ADAPTER", "pct_adapter", "AlignmentSummaryMetrics__PCT_CHIMERAS", "pct_chimeras", "AlignmentSummaryMetrics__PCT_PF_READS", "pct_pf_reads", "AlignmentSummaryMetrics__PCT_PF_READS_ALIGNED", "AlignmentSummaryMetrics__PCT_READS_ALIGNED_IN_PAIRS", "pct_reads_aligned_in_pairs", "AlignmentSummaryMetrics__PF_ALIGNED_BASES", "pf_aligned_bases", "AlignmentSummaryMetrics__PF_HQ_ALIGNED_BASES", "pf_hq_aligned_bases", "AlignmentSummaryMetrics__PF_HQ_ALIGNED_Q20_BASES", "pf_hq_aligned_q20_bases", "AlignmentSummaryMetrics__PF_HQ_ALIGNED_READS", "pf_hq_aligned_reads", "AlignmentSummaryMetrics__PF_HQ_ERROR_RATE", "pf_hq_error_rate", "AlignmentSummaryMetrics__PF_HQ_MEDIAN_MISMATCHES", "pf_hq_median_mismatches" , "AlignmentSummaryMetrics__PF_INDEL_RATE",  "pf_indel_rate" , "AlignmentSummaryMetrics__PF_MISMATCH_RATE", "pf_mismatch_rate", "AlignmentSummaryMetrics__PF_NOISE_READS", "pf_noise_reads", "AlignmentSummaryMetrics__PF_READS", "pf_reads", "AlignmentSummaryMetrics__PF_READS_ALIGNED", "pf_reads_aligned", "AlignmentSummaryMetrics__READS_ALIGNED_IN_PAIRS", "reads_aligned_in_pairs", "AlignmentSummaryMetrics__STRAND_BALANCE", "strand_balance", "AlignmentSummaryMetrics__TOTAL_READS", "total_reads", "RnaSeqMetrics__CODING_BASES", "coding_bases", "RnaSeqMetrics__CORRECT_STRAND_READS", "correct_strand_reads", "RnaSeqMetrics__IGNORED_READS", "ignored_reads", "RnaSeqMetrics__INCORRECT_STRAND_READS", "incorrect_strand_reads", "RnaSeqMetrics__INTERGENIC_BASES", "intergenic_bases", "RnaSeqMetrics__INTRONIC_BASES", "intronic_bases", "RnaSeqMetrics__MEDIAN_3PRIME_BIAS", "median_3prime_bias", "RnaSeqMetrics__MEDIAN_5PRIME_BIAS", "median_5prime_bias", "RnaSeqMetrics__MEDIAN_5PRIME_TO_3PRIME_BIAS", "median_5prime_to_3prime_bias", "RnaSeqMetrics__MEDIAN_CV_COVERAGE", "median_cv_coverage", "RnaSeqMetrics__PCT_CODING_BASES", "pct_coding_bases", "RnaSeqMetrics__PCT_CORRECT_STRAND_READS", "pct_correct_strand_reads", "RnaSeqMetrics__PCT_INTERGENIC_BASES", "pct_intergenic_bases", "RnaSeqMetrics__PCT_INTRONIC_BASES", "pct_intronic_bases", "RnaSeqMetrics__PCT_MRNA_BASES", "pct_mrna_bases", "RnaSeqMetrics__PCT_RIBOSOMAL_BASES","pct_ribosomal_bases",  "RnaSeqMetrics__PCT_USABLE_BASES", "pct_usable_bases", "RnaSeqMetrics__PCT_UTR_BASES", "pct_utr_bases", "RnaSeqMetrics__PF_ALIGNED_BASES", "pct_pf_reads_aligned", "RnaSeqMetrics__PF_BASES", "pf_bases", "RnaSeqMetrics__RIBOSOMAL_BASES", "ribosomal_bases", "RnaSeqMetrics__UTR_BASES" , "utr_bases") 
@@ -552,19 +554,17 @@ table( Master_Censor$projid %in% Meta_Final$projid_repaired )
 Passed_Master <- Passed_Master[ Passed_Master$projid %in% Meta_Final$projid_repaired, ]
 
 
+
 #Write Final MetaData to final file
-write.csv( Meta_Final, '~/sageseqr/RosMap_RNASeq_Meta_Master.csv', row.names = F )
+write.csv( Meta_Final, 'RosMap_RNASeq_Meta_Master.csv', row.names = F )
 activity <- Activity(
     'RosMap RNASeq Master With Ages Over 90',
     description='Total RNASeq Meta Data for RosMap RNASeq',
-    executed= thisFile,  
+    executed = thisFile,
     used=c('syn22355545',"syn22314230","syn22301601","syn22283382","syn22283384","syn22301603","syn22314232","syn3191087",'syn21323366','syn21088596'))
-file <- File('~/sageseqr/RosMap_RNASeq_Meta_Master.csv', description='RosMap RNASeq MetaData', parent='syn23569327')
+file <- File('RosMap_RNASeq_Meta_Master.csv', description='RosMap RNASeq MetaData', executed = thisFile, parent='syn23569327')
 file <- synStore(file, activity=activity)
 
-file <- File('~/sageseqr/RosMap_RNASeq_Meta_Master.csv', description='RosMap RNASeq MetaData', parent='syn23573926')
+file <- File('RosMap_RNASeq_Meta_Master.csv', description='RosMap RNASeq MetaData', executed = thisFile, parent='syn23573926')
 file <- synStore(file, activity=activity)
 
-################################################################################
-
-```
