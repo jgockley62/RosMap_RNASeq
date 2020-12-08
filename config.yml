@@ -29,24 +29,26 @@ default:
   skip model: TRUE
   report: "output-report"
 rosmap:
-  analysis title: openSci
+  analysis title: rosmap
   counts:
-    synID: syn22084837
-    version:
+    synID: syn23593968
+    version: 1
     gene id: feature
   metadata:
-    synID: syn22090070
+    synID: syn23573928
     version: 2
-    sample id: sampleID
+    sample id: sampleid
   biomart:
-    synID: syn21907998
+    synID: 
     version:
     filters: ensembl_gene_id
     host: ensembl.org
     organism: hsa
-  factors: ["sampleID", "batch", "sex", "diagnosis"]
-  continuous: ["RIN", "pmi", "ageofdeath"]
-  x_var: diagnosis
+  factors: ['sampleid', 'apoe4',  'batch', 'notes', 'tissue', 'diagnosis', 'sex', 'race','spanish', 'braaksc', 'ceradsc', 'cogdx', 'dcfdx_lv' ]
+  continuous: ['pmi', 'rincontinuous', 'rin2', 'age_death', 'cts_mmse30_lv', "pct_pf_reads_aligned",
+                "pct_coding_bases", "pct_intergenic_bases", "pct_intronic_bases",
+                "pct_ribosomal_bases"  ]
+  x_var: diagnosiss
   conditions:
     sex-diagnosis interaction: ["diagnosis", "sex"]
     diagnosis: ["diagnosis"]
@@ -55,6 +57,6 @@ rosmap:
   dimensions:
     color: "diagnosis"
     shape: "batch"
-    size: "ageofdeath"
+    size: "age_death"
   skip model: TRUE
   report: "output-report"
