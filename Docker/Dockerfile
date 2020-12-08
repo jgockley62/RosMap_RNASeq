@@ -1,7 +1,7 @@
 FROM rocker/tidyverse:4.0.0
 
 RUN apt-get update -y\
-&& apt-get install -y dpkg-dev zlib1g-dev libssl-dev libffi-dev zlib1g-dev libbz2-dev liblzma-dev\
+&& apt-get install -y dpkg-dev zlib1g-dev libssl-dev libffi-dev zlib1g-dev libbz2-dev liblzma-dev build-essential libglpk40\
 && apt-get install -y curl libcurl4-openssl-dev\
 && apt-get install -y git\
 && R -e "install.packages('BiocManager')"\
