@@ -167,7 +167,8 @@ if( RinCut == F ){
     synapser::synSetAnnotations(ENRICH_OBJ, annotations = all.annotations)
 }else{
   clean_md <- clean_md[ clean_md$rincontinuous >5 | clean_md$specimenID %in% c('380_120503','500_120515'), ]
-  save(import_metadata[import_metadata$specimenID %in% row.names(clean_md),], clean_md, file = 'ROSMAP_RinOver5_sageseqr_Meta.RData')
+  import_metadata <- import_metadata[import_metadata$specimenID %in% row.names(clean_md),]
+  save(import_metadata, clean_md, file = 'ROSMAP_RinOver5_sageseqr_Meta.RData')
   ENRICH_OBJ <-  synapser::synStore( synapser::File( path='ROSMAP_RinOver5_sageseqr_Meta.RData', name = 'Rin Over5 Rosmap Sagseqr MetaData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
     all.annotations$dataSubType = 'Metadata'
     synapser::synSetAnnotations(ENRICH_OBJ, annotations = all.annotations)
@@ -175,7 +176,7 @@ if( RinCut == F ){
   
     CODE <- synapser::synStore(synapser::Folder(name = "Count_Data", parentId = "syn23573925"))   
   
-    save(cqn_counts, clean_md, file = 'ROSMAP_RinOver5_sageseqr_Counts.RData')
+    save(cqn_counts, file = 'ROSMAP_RinOver5_sageseqr_Counts.RData')
   ENRICH_OBJ <-  synapser::synStore( synapser::File( path='ROSMAP_RinOver5_sageseqr_Counts.RData', name = 'Rin Over5 Rosmap Sagseqr MetaData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
     all.annotations$dataSubType = 'RNAseq'
     synapser::synSetAnnotations(ENRICH_OBJ, annotations = all.annotations)
