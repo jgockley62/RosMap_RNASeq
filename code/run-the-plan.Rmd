@@ -31,7 +31,7 @@ library(sageseqr)
 # Login to Synapse. Make a Synapse account and use synapser to login: https://r-docs.synapse.org/articles/manageSynapseCredentials.html
 synapser::synLogin()
 setwd('~/RosMap_RNASeq/')
-
+SaveNormOb==F
 
 Sys.setenv(R_CONFIG_ACTIVE = "rosmap")
 
@@ -63,7 +63,7 @@ plan <- sageseqr::rnaseq_plan(
 ```
 
 ```{r brokenoutplan}
-
+setwd('~/RosMap_RNASeq/')
 MakeBioMart=FALSE
 
 import_metadata <- get_data("syn23573928", 2L)
@@ -72,7 +72,12 @@ counts <- tibble::column_to_rownames(import_counts, var = "feature")
 
 clean_md <- clean_covariates(md = import_metadata, factors = c("sampleid", "apoe4", "batch", "notes", "tissue", "diagnosis", "sex", "race", "spanish", "braaksc", "ceradsc", "cogdx", "dcfdx_lv"), continuous = c("pmi", "rincontinuous", "rin2", "age_death", "cts_mmse30_lv", "pct_pf_reads_aligned", "pct_coding_bases", "pct_intergenic_bases", "pct_intronic_bases", "pct_ribosomal_bases"), sample_identifier = "sampleid")
 
-if( MakeBioMart=TRUE ){
+clean_md <- clean_md[ clean_md$FailQC_SampleSwapped ==0,]
+counts <- counts[,row.names(clean_md)]
+
+clean_md <- clean_md[, c( "individualID","apoe4", "batch", "notes", "tissue", "diagnosis", "sex", "race", "spanish", "braaksc", "ceradsc", "cogdx", "dcfdx_lv", "pmi", "rincontinuous", "rin2", "age_death", "cts_mmse30_lv", "pct_pf_reads_aligned", "pct_coding_bases", "pct_intergenic_bases", "pct_intronic_bases", "pct_ribosomal_bases")]
+
+if( MakeBioMart==TRUE ){
   biomart_results <- get_biomart(count_df = counts, synid = NULL, version = NULL, filters = "ensembl_gene_id", host = "ensembl.org", organism = "hsa")
 
   biomart_results$ensembl_gene_id <- row.names(biomart_results)
@@ -81,7 +86,8 @@ if( MakeBioMart=TRUE ){
                                        'chromosome_name',	'gene_length')
                                     ]
   write.csv(biomart_results, 'RosMap_BioMartObject.csv', row.names=F, quote=F)
-  
+  write.table(biomart_results, 'RosMap_BioMartObject.tsv', row.names=F, col.names = T, sep='\t', quote=F)
+
   thisFileName <- 'run-the-plan.Rmd'
   # Github link
   thisRepo <- githubr::getRepo(repository = "jgockley62/RosMap_RNASeq", ref="branch", refName='master')
@@ -90,70 +96,454 @@ if( MakeBioMart=TRUE ){
 
   parentID <- 'syn23573926'
   
-  activity <- Activity(
+  activity <- synapser::Activity(
     'RosMap Biomart Object',
     description='Gene ID (ensmbl) Info for RosMap RNA-Seq',
     executed = thisFile,
     used=c('syn23593968'))
-file <- File('RosMap_BioMartObject.csv', description='Gene ID (ensmbl) Info for RosMap RNA-Seq', executed = thisFile, parent=parentID)
-file <- synStore(file, activity=activity)
+  file <- synapser::File('/home/jgockley/RosMap_RNASeq/RosMap_BioMartObject.tsv', description='Gene ID (ensmbl) Info for RosMap RNA-Seq', executed = thisFile, parent=parentID)
+  file <- synapser::synStore(file, activity=activity)
 
+}else{
+  biomart_results <- get_biomart(count_df = counts, synid = "syn23625835", version = 4, filters = "ensembl_gene_id", host = "ensembl.org", organism = "hsa")
 }
-rm(count_df)
-rm(synid)
-rm(version)
-rm(filters)
-rm(host)
-rm(organism)
 
-function (count_df, synid, version, host, filters, organism) 
-{
-    if (is.null(synid)) {
-        ensembl <- biomart_obj(organism, host)
-        count_df <- parse_counts(count_df)
-        gene_ids <- convert_geneids(count_df)
-        message(paste0("Downloading sequence", ifelse(length(gene_ids) > 
-            1, "s", ""), " ..."))
-        if (length(gene_ids) > 100) 
-            message("This may take a few minutes ...")
-        attrs <- c(filters, "ensembl_exon_id", "chromosome_name", 
-            "exon_chrom_start", "exon_chrom_end")
-        coords <- biomaRt::getBM(filters = filters, attributes = attrs, 
-            values = gene_ids, mart = ensembl, useCache = FALSE)
-        gene_ids <- unique(coords[, filters])
-        coords <- sapply(gene_ids, function(i) {
-            i.coords <- coords[coords[, 1] == i, 3:5]
-            g <- GenomicRanges::GRanges(i.coords[, 1], IRanges::IRanges(i.coords[, 
-                2], i.coords[, 3]))
-            g
-        })
-        length <- plyr::ldply(coords[gene_ids], function(x) sum(IRanges::width(x)), 
-            .id = "ensembl_gene_id") %>% dplyr::rename(gene_length = .data$V1)
-        gc_content <- biomaRt::getBM(filters = filters, attributes = c(filters, 
-            "hgnc_symbol", "percentage_gene_gc_content", "gene_biotype", 
-            "chromosome_name"), values = gene_ids, mart = ensembl, 
-            useCache = FALSE)
-        biomart_results <- dplyr::full_join(gc_content, length)
-        biomart_results <- collapse_duplicate_hgnc_symbol(biomart_results)
-        biomart_results <- tibble::column_to_rownames(biomart_results, 
-            var = filters)
-        biomart_results
-    }
-    else {
-        biomart_results <- get_data(synid, version)
-        biomart_results <- tibble::column_to_rownames(biomart_results, 
-            var = filters)
-        required_variables <- c("gene_length", "percentage_gene_gc_content")
-        if (!all(required_variables %in% colnames(biomart_results))) {
-            vars <- glue::glue_collapse(setdiff(required_variables, 
-                colnames(biomart_results)), sep = ", ", last = " and ")
-            message(glue::glue("Warning: {vars} missing from biomart object.\n                         This information is required for Conditional\n                         Quantile Normalization"))
-        }
-        return(biomart_results)
-    }
+filtered_counts <- filter_genes(clean_metadata = clean_md, count_df = counts, conditions = list(`sex-diagnosis interaction` = c("diagnosis", "sex"), `sex-tissue-diagnosis interaction` = c("diagnosis", "tissue", "sex"), diagnosis = "diagnosis", sex = "sex", tissue = "tissue"), cpm_threshold = 1, conditions_threshold = 0.5)
+
+biotypes <- summarize_biotypes(filtered_counts, biomart_results)
+
+cqn_counts <- cqn(filtered_counts, biomart_results)
+
+if(SaveNormOb==T){
+  activityName = 'Covariate Regression';
+  activityDescription = 'SageSeqR Covariate analysis and Regression of All aligned effective counts with GRCh38 with CQN normalisation (PCC, ACC, DLPFC)';
+  thisFileName <- 'run-the-plan.Rmd'
+  # Github link
+  thisRepo <- githubr::getRepo(repository = "jgockley62/RosMap_RNASeq", ref="branch", refName='master')
+  thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath=paste0('code/',thisFileName))
+  
+  CODE <- syn_temp$store(synapseclient$Folder(name = "Metadata", parentId = "syn23573925"))
+  
+  Syns_Used <- c( "syn23625835",
+                  "syn23573928",
+                  "syn23593968"
+                )
+  # Set annotations
+  all.annotations = list(
+    dataType = 'mRNA',
+    dataSubType = 'geneExp',
+    summaryLevel = 'gene',
+    assay	 = 'RNAseq',
+    tissueTypeAbrv	= c('PCC','ACC','DLPFC'), 
+    study = 'ROSMAP', 
+    organism = 'HomoSapiens',
+    consortium	= 'ROSMAP',
+    normalizationStatus	= TRUE,
+    normalizationType	= 'CQN',
+    rnaquantification = 'RSEM',
+    genomeAssemblyID = 'GRCh38'
+  )
+  # Store SVA results
+  
+  clean_md <- clean_covariates(md = import_metadata, factors = c("sampleid", "apoe4", "batch", "notes", "tissue", "diagnosis", "sex", "race", "spanish", "braaksc", "ceradsc", "cogdx", "dcfdx_lv"), continuous = c("pmi", "rincontinuous", "rin2", "age_death", "cts_mmse30_lv", "pct_pf_reads_aligned", "pct_coding_bases", "pct_intergenic_bases", "pct_intronic_bases", "pct_ribosomal_bases"), sample_identifier = "sampleid")
+clean_md <- clean_md[ clean_md$FailQC_SampleSwapped ==0,]
+
+  save(import_metadata, clean_md, file = 'ROSMAP_All_sageseqr_Meta.RData')
+  ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='ROSMAP_All_sageseqr_Meta.RData', name = 'All Rosmap Sagseqr MetaData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
+    all.annotations$dataSubType = 'Metadata'
+    syn_temp$setAnnotations(ENRICH_OBJ, annotations = all.annotations)
+  
+    CODE <- syn_temp$store(synapseclient$Folder(name = "Count_Data", parentId = "syn23573925"))   
+  
+    save(cqn_counts, clean_md, file = 'ROSMAP_All_sageseqr_Counts.RData')
+  ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='ROSMAP_All_sageseqr_Counts.RData', name = 'All Rosmap Sagseqr MetaData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
+    all.annotations$dataSubType = 'Metadata'
+    syn_temp$setAnnotations(ENRICH_OBJ, annotations = all.annotations)
+} 
+
+# gene_coexpression <- graphics::hist(stats::cor(t(cqn_counts$E)), xlab = "Correlation")
+
+# boxplots <- boxplot_vars(md = clean_md, include_vars = c("pmi", "rincontinuous", "rin2", "age_death", "cts_mmse30_lv", "pct_pf_reads_aligned", "pct_coding_bases", "pct_intergenic_bases", "pct_intronic_bases", "pct_ribosomal_bases"), x_var = "diagnosis")
+
+# Issue #  plot_sexcheck(clean_md, counts, biomart_results, config::get("sex check"))
+
+# correlation_plot <- get_association_statistics(clean_md)
+# Issue # significant_covariates_plot <- run_pca_and_plot_correlations(cqn_counts$E, clean_md)
+```
+
+```{r SexCheck}
+
+library( tidyr )
+library( dplyr )
+library( ggplot2 )
+library( gridExtra )
+
+#Remove the Toss$SageID
+#row.names(METADATA) <- METADATA$sampleID
+#COUNT$ensembl_gene_id <- row.names(COUNT)
+SexCheck_Manual <- function( METADATA, COUNT, biomart_results){
+  #'@COUNT a counts object ( eg. cqn_counts$counts or cqn_counts$E )
+  #'@METADATA a metadata object ( eg. clean_md )
+  #'@biomart_results a biomart results object ( eg. biomart_results )
+  
+  METADATA <- clean_md
+  #COUNT <- as.data.frame( cqn_counts$counts )
+  #COUNT <- as.data.frame( cqn_counts$E )
+  COUNT <- as.data.frame( COUNT )
+  METADATA$sampleID <- row.names(METADATA)
+  COUNT$ensembl_gene_id <- row.names(COUNT)
+  COUNT <- as.data.frame( cbind( ensembl_gene_id = COUNT[,c( "ensembl_gene_id")], COUNT[,1:(length(COUNT)-1) ] ))
+  
+  biomart_results$ensembl_gene_id <- row.names(biomart_results)
+  
+  REPORTED.GENDER.COUNTS = biomart_results[row.names(COUNT),] %>% 
+    left_join(COUNT) %>%
+    dplyr::select(-one_of("percentage_gene_gc_content")) %>%
+    filter(chromosome_name == "X" |chromosome_name == "Y") %>% 
+    tidyr::gather(key = item, value = value, -c( ensembl_gene_id, hgnc_symbol, gene_biotype, chromosome_name, gene_length, ensembl_gene_id)) %>%
+    dplyr::mutate(value = log(value)) %>%
+    dplyr::rename(`counts(log)`= value) %>% 
+    dplyr::rename(sampleID = item) %>%
+    left_join(METADATA[ ,c("sampleID", "sex")]) %>% 
+    dplyr::rename(`Reported Gender` = sex) 
+  my.theme <- theme_bw() %+replace% theme(legend.position = 'top', axis.text.x = element_text(angle = 90, hjust = 1), plot.title=element_text(hjust=0.5))
+  p = list()
+  p[[1]] = ggplot(filter(REPORTED.GENDER.COUNTS, chromosome_name == "X"), aes(x = `Reported Gender`, y = `counts(log)`)) + geom_boxplot()
+  p[[1]] = p[[1]] + ggtitle('X') + my.theme
+  p[[2]] = ggplot(filter(REPORTED.GENDER.COUNTS, chromosome_name == "Y"), aes(x = `Reported Gender`, y = `counts(log)`)) + geom_boxplot()
+  p[[2]] = p[[2]] + ggtitle('Y') + my.theme
+  #multiplot(plotlist = p, cols = 2)
+  grid.arrange(p[[1]], p[[2]], ncol=2)
+  ##XIST and UTY expression 
+  #ENSG00000229807.11 and ENSG00000183878.15 
+  #Plot initial data
+  FILT <- REPORTED.GENDER.COUNTS[ , c('ensembl_gene_id', 'chromosome_name', 'sampleID','counts(log)', 'Reported Gender')] %>% 
+    filter( ensembl_gene_id == "ENSG00000229807" | ensembl_gene_id == "ENSG00000183878") %>% 
+    dplyr::select(-one_of("chromosome_name")) %>% 
+    tidyr::spread(key = ensembl_gene_id, value = `counts(log)`) %>% 
+    mutate(XIST = as.numeric(`ENSG00000229807`)) %>% 
+    mutate(UTY = as.numeric(`ENSG00000183878`)) %>% 
+    mutate(UTY = ifelse(UTY == -Inf, 0, UTY)) %>% 
+    mutate(XIST = ifelse(XIST == -Inf, 0, XIST)) %>%
+    mutate(UTY = ifelse(is.nan(UTY), 0, UTY)) %>% 
+    mutate(XIST = ifelse(is.nan(XIST), 0, XIST)) %>%
+    mutate(UTY = ifelse(is.na(UTY), 0, UTY)) %>% 
+    mutate(XIST = ifelse(is.na(XIST), 0, XIST))
+  p = ggplot(FILT, aes (x= XIST, y = UTY)) 
+  p = p + geom_point(aes(color=`Reported Gender`)) + 
+    ggtitle("Sex Check Inital Sex: RosMap Combined Cohort") + 
+    theme(plot.title = element_text(hjust = 0.5, size = 15)) +
+    labs(colour = "Reported Gender")
+  return(p)
+}
+
+SexCheck_Manual( clean_md, cqn_counts$counts, biomart_results )
+SexCheck_Manual( clean_md, cqn_counts$E, biomart_results )
+
+plot_sexcheck <- function(clean_metadata, count_df, biomart_results, sex_var){
+#Trouble Shoot Drake
+#clean_metadata <- clean_md
+#count_df <- counts
+#biomart_results <- biomart_results
+#sex_var <- 'sex'
+    md <- tibble::rownames_to_column(clean_metadata, var = "sampleId") %>% 
+        dplyr::select(.data$sampleId, !!sex_var)
+    sex_specific <- count_df[grepl(paste0(rownames(biomart_results[biomart_results$hgnc_symbol %in% 
+        c("UTY", "XIST"), ]), collapse = "|"), rownames(count_df)), 
+        ]
+    rownames(sex_specific) <- convert_geneids(sex_specific)
+    #sex_specific <- tibble::rownames_to_column(sex_specific, var = "geneId")
+    
+    temp <- cbind( row.names(count_df), do.call( rbind, strsplit( row.names(count_df), '[.]'))[ ,1 ] )
+    temp <- temp[ !duplicated(temp[,2]), ]
+    count_df <- count_df[ temp[,1], ]
+    row.names(count_df) <- do.call( rbind, strsplit( row.names(count_df), '[.]'))[ ,1 ]
+    biomart_results <- biomart_results[,c("ensembl_gene_id","hgnc_symbol", "percentage_gene_gc_content", 
+                                          "gene_biotype", "chromosome_name", "gene_length" )]
+    count_df <- count_df[ c("ENSG00000229807","ENSG00000183878"), ]
+    count_df <- as.data.frame( cbind(ensembl_gene_id = row.names(count_df), count_df[ , 1:dim(count_df)[2] ]))
+      
+    #results = biomart_results[row.names(count_df),] %>% 
+    results = biomart_results[c("ENSG00000229807","ENSG00000183878"),] %>% 
+    left_join(count_df) %>%
+    dplyr::select(-one_of("percentage_gene_gc_content")) %>%
+    filter(chromosome_name == "X" |chromosome_name == "Y") %>% 
+    tidyr::gather(key = item, value = value, -c( ensembl_gene_id, hgnc_symbol, gene_biotype, chromosome_name, gene_length, ensembl_gene_id)) %>%
+    dplyr::mutate(value = log(value)) %>%
+    dplyr::rename(`counts(log)`= value) %>% 
+    dplyr::rename(sampleID = item) %>%
+    left_join(METADATA[ ,c("sampleID", "sex")]) %>% 
+    dplyr::rename(`Reported Gender` = sex) 
+    
+    FILT <- results[ , c('ensembl_gene_id', 'chromosome_name', 'sampleID','counts(log)', 'Reported Gender')] %>% 
+    filter( ensembl_gene_id == "ENSG00000229807" | ensembl_gene_id == "ENSG00000183878") %>% 
+    dplyr::select(-one_of("chromosome_name")) %>% 
+    tidyr::spread(key = ensembl_gene_id, value = `counts(log)`) %>% 
+    mutate(XIST = as.numeric(`ENSG00000229807`)) %>% 
+    mutate(UTY = as.numeric(`ENSG00000183878`)) %>% 
+    mutate(UTY = ifelse(UTY == -Inf, 0, UTY)) %>% 
+    mutate(XIST = ifelse(XIST == -Inf, 0, XIST)) %>%
+    mutate(UTY = ifelse(is.nan(UTY), 0, UTY)) %>% 
+    mutate(XIST = ifelse(is.nan(XIST), 0, XIST)) %>%
+    mutate(UTY = ifelse(is.na(UTY), 0, UTY)) %>% 
+    mutate(XIST = ifelse(is.na(XIST), 0, XIST))
+    
+    p = ggplot(FILT, aes (x= XIST, y = UTY)) 
+    p = p + geom_point(aes(color=`Reported Gender`)) + 
+      ggtitle("Sex Check Inital Sex: RosMap Combined Cohort") + 
+      theme(plot.title = element_text(hjust = 0.5, size = 15)) +
+      labs(colour = "Reported Gender")
+    return(p)
 }
 
 ```
+### Sample clustering
+PCA based clustering of samples before regressing out confounding variables. Health controls are masked beause they have no APOE status
+```{r decompse.normalise.data, cache=FALSE, fig.height=6, fig.width=8, results='asis', eval=TRUE}
+# Find principal components of expression to plot
+cqn_counts$E.no.na <- cqn_counts$E
+METADATA <- clean_md
+fill<-colnames(METADATA)
+METADATA$sampleID<- row.names(METADATA)
+METADATA <- METADATA[, c('sampleID',fill)]
+
+PC <- prcomp(cqn_counts$E.no.na, scale.=T, center = T)
+# Plot first 2 PCs
+plotdata <- data.frame(sampleID=rownames(PC$rotation), 
+                       PC1=PC$rotation[,1], 
+                       PC2=PC$rotation[,2])
+plotdata <- left_join( plotdata, METADATA )
+p <- ggplot(plotdata, aes(x=PC1, y=PC2))
+p <- p + geom_point(aes(color=diagnosis, size=rincontinuous, shape = sex))
+p <- p + theme_bw() + theme(legend.position="right") + facet_grid(.~tissue, scales = 'free_y')
+p
+```
+
+
+### Clustering of Samples
+Tree based clustering of samples before regressing out confounding variables
+```{r decompse.normalise.data.1, cache=FALSE, fig.height=6, fig.width=8, results='asis', eval=TRUE}
+# Eucledian tree based analysis
+#COVARIATES.tmp = data.matrix(METADATA[,c( 'individualID', "sex", "apoeGenotype", "disease_cohort", 'ADAD_fam_mut', "ind_mut_status", "ind_mutation")])
+COVARIATES.tmp = data.matrix(METADATA[, c( "apoe4", "batch", "sex", 
+                                           "tissue", "diagnosis", 'race', "notes")
+                                      ])
+COVARIATES.tmp[is.na(COVARIATES.tmp)] = 0
+tree = hclust(as.dist(t(cqn_counts$E.no.na)))
+cols = WGCNA::labels2colors(COVARIATES.tmp);
+WGCNA::plotDendroAndColors(tree, 
+                           colors = cols, 
+                           dendroLabels = FALSE, 
+                           abHeight = 0.80, 
+                           main = "Sample dendrogram",
+                           groupLabels = colnames(COVARIATES.tmp))
+```
+
+
+### Distribution of samples (log cpm)
+Log(Counts Per Million) density distribution of all genes accross each sample by cohort
+```{r lcpm.dist, cache=FALSE, fig.height=6, fig.width=8, results='asis', eval=TRUE}
+# Plot abberent distribution of logcpm counts
+tmp1 = cqn_counts$E %>%
+  rownameToFirstColumn('Gene.ID') %>%
+  tidyr::gather(sampleID, logCPM, -Gene.ID) %>%
+  left_join(METADATA %>%
+              rownameToFirstColumn('sampleID'))
+p = ggplot(tmp1, aes(x = logCPM, color = diagnosis)) + geom_density() 
+p = p + theme() + facet_grid(.~tissue, scale = 'free')
+p
+```
+
+Coexpression of genes 
+```{r coexp1, cache=FALSE, fig.height=6, fig.width=8, results='asis', eval=TRUE}
+cr = cor(t(cqn_counts$E.no.na))
+hist(cr, main = 'Distribution of correlation between genes', xlab = 'Correlation')
+```
+
+### Significant Covariates
+Correlation between pca of unadjusted mRNA expression and covariates are used to find significant covariates
+```{r preadj.covariates}
+# Find correlation between PC's of gene expression with covariates
+#library(CovariateAnalysis)
+#detach(package:CovariateAnalysis)
+#get the package from devtools::install_github('th1vairam/CovariateAnalysis@dev')
+METADATA$sampleID <- as.factor(METADATA$sampleID)
+preAdjustedSigCovars = runPCAandPlotCorrelations(cqn_counts$E.no.na, 
+                                                 METADATA,
+                                                 'NULL design(voom-normalized)', 
+                                                 isKeyPlot=TRUE, 
+                                                 MIN_PVE_PCT_PC = 1)
+```
+
+```{r preadj.covariates, cache=FALSE, fig.height=6, fig.width=8, results='asis', eval=TRUE}
+##########################
+my.calcCompleteCorAndPlot <- function (COMPARE_data, COVAR_data, correlationType, title, WEIGHTS = NULL, PLOT_ALL_COVARS = FALSE, EXCLUDE_VARS_FROM_FDR = NULL, MAX_FDR = 0.1){
+      #COMPARE_data <- samplePCvals
+      #COVAR_data <- samplesByCovariates
+      #correlationType <- CORRELATION_TYPE
+      #title <- title
+      #WEIGHTS = pve[1:dim(samplePCvals)[2]] 
+      #PLOT_ALL_COVARS = PLOT_ALL_COVARS
+      #EXCLUDE_VARS_FROM_FDR = EXCLUDE_VARS_FROM_FDR
+      #MAX_FDR = 0.1
+      
+      FactorCovariates <- colnames(COVAR_data)[sapply(COVAR_data, 
+                                                      is.factor)]
+      ContCovariates <- setdiff(colnames(COVAR_data), FactorCovariates)
+      if (length(FactorCovariates) > 0) {
+        comb <- expand.grid(colnames(COMPARE_data), FactorCovariates)
+        factCont_cor <- plyr::ddply(comb, .variables=c('Var1', 'Var2'), .fun = getFactorContAssociationStatistics, 
+                                    cbind(COMPARE_data, COVAR_data[rownames(COMPARE_data), 
+                                                                   FactorCovariates, drop = F]), alpha = MAX_FDR)
+        factCont_cor <- plyr::ddply(comb, .variables = c('Var1', 'Var2'), .fun = getFactorContAssociationStatistics, 
+                                    cbind(COMPARE_data, COVAR_data[rownames(COMPARE_data), 
+                                                                   FactorCovariates, drop = F]), alpha = MAX_FDR)
+        
+        
+        factCont_cor_vals <- factCont_cor %>% dplyr::select(Var1, 
+                                                            Var2, Estimate) %>% tidyr::spread(Var2, Estimate)
+        rownames(factCont_cor_vals) <- factCont_cor_vals$Var1
+        factCont_cor_vals$Var1 <- NULL
+        factCont_cor_vals = factCont_cor_vals %>% data.matrix()
+        factCont_cor_p <- factCont_cor %>% dplyr::select(Var1, 
+                                                         Var2, Pval) %>% tidyr::spread(Var2, Pval)
+        rownames(factCont_cor_p) <- factCont_cor_p$Var1
+        factCont_cor_p$Var1 <- NULL
+        factCont_cor_p = factCont_cor_p %>% data.matrix()
+      }else {
+        factCont_cor_vals <- NULL
+        factCont_cor_p <- NULL
+      }
+      if (length(ContCovariates) > 0) {
+        cont_cor <- corr.test(COMPARE_data, COVAR_data[, ContCovariates, 
+                                                       drop = F], use = "pairwise.complete.obs", method = correlationType, 
+                              adjust = "none")
+        cont_cor_vals <- cont_cor$r
+        cont_cor_p <- cont_cor$p
+        rownames(cont_cor_vals) <- colnames(COMPARE_data)
+        colnames(cont_cor_vals) <- ContCovariates
+        rownames(cont_cor_p) <- colnames(COMPARE_data)
+        colnames(cont_cor_p) <- ContCovariates
+      }else {
+        cont_cor_vals <- NULL
+        cont_cor_p <- NULL
+      }
+      all_cor_vals = cbind(factCont_cor_vals, cont_cor_vals)
+      all_cor_p = cbind(factCont_cor_p, cont_cor_p)
+      Effects.significantCovars = all_cor_vals
+      Effects.significantCovars[all_cor_p > MAX_FDR] = 0
+      Effects.significantCovars = colSums(abs(Effects.significantCovars) * 
+                                            replicate(dim(Effects.significantCovars)[2], WEIGHTS/sum(WEIGHTS)))
+      Effects.significantCovars = Effects.significantCovars[order(abs(Effects.significantCovars), 
+                                                                  decreasing = T)]
+      cor_mat = reshape::melt(all_cor_p, varnames = c("COMPARE", "COVAR"))
+      colnames(cor_mat)[colnames(cor_mat) == "value"] = "pvalue"
+      cor_mat$COMPARE = factor(cor_mat$COMPARE, levels = rownames(all_cor_p))
+      cor_mat$COVAR = factor(cor_mat$COVAR, levels = colnames(all_cor_p))
+      cor_mat$r = reshape::melt(all_cor_vals)$value
+      calcFDRrows = rep(TRUE, nrow(cor_mat))
+      markColumnsAsMissing = NULL
+      if (!is.null(EXCLUDE_VARS_FROM_FDR)) {
+        calcFDRrows = !(cor_mat$COVAR %in% EXCLUDE_VARS_FROM_FDR)
+        markColumnsAsMissing = intersect(colnames(COVAR_data), 
+                                         EXCLUDE_VARS_FROM_FDR)
+      }
+      markSignificantCorrelations = corMatFDRthreshFunc(cor_mat, 
+                                                        indicesMask = calcFDRrows, MAX_FDR = 0.1)
+      significantCorrelatedCovars = sort(unique(cor_mat$COVAR[markSignificantCorrelations]))
+      markPotentialSignificantCorrelations = corMatFDRthreshFunc(cor_mat)
+      markPotentialSignificantCorrelations = markPotentialSignificantCorrelations & 
+        !calcFDRrows
+      plotRows = 1:nrow(cor_mat)
+      if (!PLOT_ALL_COVARS) {
+        plotRows = (cor_mat$COVAR %in% significantCorrelatedCovars) | 
+          !calcFDRrows
+      }
+      plotCor = na.omit(cor_mat[plotRows, ])
+      for (markCor in c("markSignificantCorrelations", "markPotentialSignificantCorrelations")) {
+        useMarkCor = get(markCor)[plotRows]
+        if (length(which(useMarkCor)) > 0) {
+          plotCor[, markCor] = useMarkCor[setdiff(1:length(useMarkCor), 
+                                                  as.numeric(attr(plotCor, "na.action")))]
+        }
+      }
+      if (!plyr::empty(plotCor)) {
+        plot = plotCorWithCompare(plotCor, title, paste("FDR <= ", 
+                                                        MAX_FDR, sep = ""), markColumnsAsMissing)
+      }else {
+        plot = NULL
+      }
+      return(list(plot = plot, significantCovars = as.character(significantCorrelatedCovars), 
+                  Effects.significantCovars = Effects.significantCovars))
+  }
+    
+unlockBinding("calcCompleteCorAndPlot", as.environment("package:CovariateAnalysis"))
+assignInNamespace("calcCompleteCorAndPlot", my.calcCompleteCorAndPlot, ns="CovariateAnalysis", envir=as.environment("package:CovariateAnalysis"))
+assign("calcCompleteCorAndPlot", my.calcCompleteCorAndPlot, as.environment("package:CovariateAnalysis"))
+  lockBinding("calcCompleteCorAndPlot", as.environment("package:CovariateAnalysis"))
+
+###########################
+# Find correlation between PC's of gene expression with covariates
+cqn_counts$E = cqn_counts$E[,row.names(clean_md)]
+cqn_counts$E.no.na = cqn_counts$E[,row.names(clean_md)]
+cqn_counts$E.no.na[is.na(cqn_counts$E.no.na)] = 0
+#clean_md
+METADATA <- as.data.frame( clean_md)
+#row.names(METADATA) <- METADATA$ 
+#METADATA <- METADATA[, colnames(METADATA) != c('specimenID') ]
+
+Meta_HeatMap <- METADATA
+#Meta_HeatMap <- Meta_HeatMap[ , colnames(Meta_HeatMap)[ colnames(Meta_HeatMap) != 'Infered.Sex']]
+Iters <- colnames(Meta_HeatMap)[colSums(is.na(Meta_HeatMap)) > 0]
+##_## dim(Meta_HeatMap)
+##_## dim(Meta_HeatMap[ complete.cases(Meta_HeatMap),])
+Meta_HeatMap <- Meta_HeatMap[ , (colnames(Meta_HeatMap) %in% Iters)==F ]
+writeLines("Total Metadata with Missing variables:")
+preAdjustedSigCovars = runPCAandPlotCorrelations(as.matrix(cqn_counts$E.no.na), 
+                                                 as.data.frame(Meta_HeatMap),
+                                                 'NULL design(voom-normalized)', 
+                                                 isKeyPlot=TRUE, 
+                                                 MIN_PVE_PCT_PC = 1)
+preAdjustedSigCovars[["PC_res"]][[2]]$plotData
+writeLines("Iterate across covariates with missingness to attempt to find association:")
+for( focus in 1:length(Iters)){
+  Meta_HeatMap_t <- METADATA
+  
+  Meta_HeatMap_t$individualID <- as.factor(Meta_HeatMap_t$individualID)
+  Meta_HeatMap_t$individualID <- as.factor(Meta_HeatMap_t$individualID)
+  
+  Meta_HeatMap_t$sampleID <- row.names(METADATA)
+  Meta_HeatMap_t <- Meta_HeatMap_t[ !is.na(Meta_HeatMap_t[,Iters[focus] ]), ]
+  exp <- cqn_counts$E.no.na[,Meta_HeatMap_t$sampleID]
+  Meta_HeatMap_t <- Meta_HeatMap_t[, (colnames(Meta_HeatMap_t) %in% c('sex', 'totalID','Family_ID', 'sampleID')) == F]
+  
+  ##_##'ADAD_fam_mut',
+  if( Iters[focus] %in% c( 'ADAD_fam_mut', 'CDR' )){
+    Meta_HeatMap_t <- Meta_HeatMap_t[ , (colnames(Meta_HeatMap_t) %in% names( which(apply(Meta_HeatMap_t, 2, var) == 0) ))==F,]
+    Meta_HeatMap_t <- Meta_HeatMap_t[ , (colnames(Meta_HeatMap_t) %in% 'disease_cohort')==F,]
+  }else{}
+  
+  preAdjustedSigCovars = runPCAandPlotCorrelations(exp, 
+                                                 Meta_HeatMap_t,
+                                                 'NULL design(voom-normalized)', 
+                                                 isKeyPlot=TRUE, 
+                                                 MIN_PVE_PCT_PC = 1)
+  preAdjustedSigCovars[["PC_res"]][[2]]$plotData
+  if( Iters[focus] %in% preAdjustedSigCovars$significantCovars ){
+    writeLines( paste0( Iters[focus], " Is Significantly Associated"))
+  }else{
+    writeLines( paste0( Iters[focus], " Is NOT Significantly Associated"))
+  }
+}
+## RIN, Sex, disease_cohort, RnaSeqMetrics__PCT_CODING_BASES, RnaSeqMetrics__PCT_INTERGENIC_BASES, RnaSeqMetrics__INTRONIC_BASES, RnaSeqMetrics__PCT_INTRONIC_BASES
+# Ind Mut Status: Yes PC11
+# APOE: Yes PC5, PC11
+# Ind_Mutation: NO
+# ADAD_fam_mut: NO
+# CDR: NO 
+# Age: NO
+```
+
 
 ```{r fulldrakeplan}
 drake::make(
