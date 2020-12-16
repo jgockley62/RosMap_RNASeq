@@ -31,7 +31,6 @@ library(sageseqr)
 # Login to Synapse. Make a Synapse account and use synapser to login: https://r-docs.synapse.org/articles/manageSynapseCredentials.html
 synapser::synLogin()
 setwd('~/RosMap_RNASeq/')
-SaveNormOb==F
 
 Sys.setenv(R_CONFIG_ACTIVE = "rosmap")
 
@@ -65,7 +64,8 @@ plan <- sageseqr::rnaseq_plan(
 ```{r brokenoutplan}
 setwd('~/RosMap_RNASeq/')
 MakeBioMart=FALSE
-
+SaveNormOb=F
+RinCut == F
 import_metadata <- get_data("syn23573928", 2L)
 import_counts <- get_data("syn23593968", 1L)
 counts <- tibble::column_to_rownames(import_counts, var = "feature")
@@ -73,6 +73,11 @@ counts <- tibble::column_to_rownames(import_counts, var = "feature")
 clean_md <- clean_covariates(md = import_metadata, factors = c("sampleid", "apoe4", "batch", "notes", "tissue", "diagnosis", "sex", "race", "spanish", "braaksc", "ceradsc", "cogdx", "dcfdx_lv"), continuous = c("pmi", "rincontinuous", "rin2", "age_death", "cts_mmse30_lv", "pct_pf_reads_aligned", "pct_coding_bases", "pct_intergenic_bases", "pct_intronic_bases", "pct_ribosomal_bases"), sample_identifier = "sampleid")
 
 clean_md <- clean_md[ clean_md$FailQC_SampleSwapped ==0,]
+
+if( RinCut == T){
+  clean_md <- clean_md[ clean_md$rincontinuous >5 | clean_md$specimenID %in% c('380_120503','500_120515'), ]
+}
+
 counts <- counts[,row.names(clean_md)]
 
 clean_md <- clean_md[, c( "individualID","apoe4", "batch", "notes", "tissue", "diagnosis", "sex", "race", "spanish", "braaksc", "ceradsc", "cogdx", "dcfdx_lv", "pmi", "rincontinuous", "rin2", "age_death", "cts_mmse30_lv", "pct_pf_reads_aligned", "pct_coding_bases", "pct_intergenic_bases", "pct_intronic_bases", "pct_ribosomal_bases")]
@@ -122,7 +127,7 @@ if(SaveNormOb==T){
   thisRepo <- githubr::getRepo(repository = "jgockley62/RosMap_RNASeq", ref="branch", refName='master')
   thisFile <- githubr::getPermlink(repository = thisRepo, repositoryPath=paste0('code/',thisFileName))
   
-  CODE <- syn_temp$store(synapseclient$Folder(name = "Metadata", parentId = "syn23573925"))
+  CODE <- synapser::synStore(synapser::Folder(name = "Metadata", parentId = "syn23573925"))
   
   Syns_Used <- c( "syn23625835",
                   "syn23573928",
@@ -147,18 +152,34 @@ if(SaveNormOb==T){
   
   clean_md <- clean_covariates(md = import_metadata, factors = c("sampleid", "apoe4", "batch", "notes", "tissue", "diagnosis", "sex", "race", "spanish", "braaksc", "ceradsc", "cogdx", "dcfdx_lv"), continuous = c("pmi", "rincontinuous", "rin2", "age_death", "cts_mmse30_lv", "pct_pf_reads_aligned", "pct_coding_bases", "pct_intergenic_bases", "pct_intronic_bases", "pct_ribosomal_bases"), sample_identifier = "sampleid")
 clean_md <- clean_md[ clean_md$FailQC_SampleSwapped ==0,]
-
+if( RinCut == F ){
   save(import_metadata, clean_md, file = 'ROSMAP_All_sageseqr_Meta.RData')
-  ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='ROSMAP_All_sageseqr_Meta.RData', name = 'All Rosmap Sagseqr MetaData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
+  ENRICH_OBJ <-  synapser::synStore( synapser::File( path='ROSMAP_All_sageseqr_Meta.RData', name = 'All Rosmap Sagseqr MetaData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
     all.annotations$dataSubType = 'Metadata'
-    syn_temp$setAnnotations(ENRICH_OBJ, annotations = all.annotations)
+    synapser::synSetAnnotations(ENRICH_OBJ, annotations = all.annotations)
+    #syn_temp$setAnnotations(ENRICH_OBJ, annotations = all.annotations)
   
-    CODE <- syn_temp$store(synapseclient$Folder(name = "Count_Data", parentId = "syn23573925"))   
+    CODE <- synapser::synStore(synapser::Folder(name = "Count_Data", parentId = "syn23573925"))   
   
     save(cqn_counts, clean_md, file = 'ROSMAP_All_sageseqr_Counts.RData')
-  ENRICH_OBJ <-  syn_temp$store( synapseclient$File( path='ROSMAP_All_sageseqr_Counts.RData', name = 'All Rosmap Sagseqr MetaData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
+  ENRICH_OBJ <-  synapser::synStore( synapser::File( path='ROSMAP_All_sageseqr_Counts.RData', name = 'All Rosmap Sagseqr MetaData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
     all.annotations$dataSubType = 'Metadata'
-    syn_temp$setAnnotations(ENRICH_OBJ, annotations = all.annotations)
+    synapser::synSetAnnotations(ENRICH_OBJ, annotations = all.annotations)
+}else{
+  save(import_metadata, clean_md, file = 'ROSMAP_RinOver5_sageseqr_Meta.RData')
+  ENRICH_OBJ <-  synapser::synStore( synapser::File( path='ROSMAP_RinOver5_sageseqr_Meta.RData', name = 'Rin Over5 Rosmap Sagseqr MetaData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
+    all.annotations$dataSubType = 'Metadata'
+    synapser::synSetAnnotations(ENRICH_OBJ, annotations = all.annotations)
+    #syn_temp$setAnnotations(ENRICH_OBJ, annotations = all.annotations)
+  
+    CODE <- synapser::synStore(synapser::Folder(name = "Count_Data", parentId = "syn23573925"))   
+  
+    save(cqn_counts, clean_md, file = 'ROSMAP_RinOver5_sageseqr_Counts.RData')
+  ENRICH_OBJ <-  synapser::synStore( synapser::File( path='ROSMAP_RinOver5_sageseqr_Counts.RData', name = 'Rin Over5 Rosmap Sagseqr MetaData', parentId=CODE$properties$id ), used = Syns_Used, activityName = activityName, executed = thisFile, activityDescription = activityDescription)
+    all.annotations$dataSubType = 'RNAseq'
+    synapser::synSetAnnotations(ENRICH_OBJ, annotations = all.annotations)
+}   
+  
 } 
 
 # gene_coexpression <- graphics::hist(stats::cor(t(cqn_counts$E)), xlab = "Correlation")
