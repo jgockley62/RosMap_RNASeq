@@ -273,7 +273,7 @@ counts <- counts[,metadata$Sampleid]
 # Harmonize case-control status
 metadata$diagnosis <- "other"
 metadata$diagnosis[metadata$cogdx == 1 & metadata$braaksc <= 3 & metadata$ceradsc >= 3] <- "control"
-metadata$diagnosis[metadata$cogdx == 4 & metadata$braaksc <= 4 & metadata$ceradsc >= 2] <- "AD"
+metadata$diagnosis[metadata$cogdx == 4 & metadata$braaksc >= 4 & metadata$ceradsc <= 2] <- "AD"
 
 # Add sex variable
 metadata$sex <- "female"
