@@ -1,8 +1,8 @@
-FROM rocker/tidyverse:4.0.0
+FROM rocker/tidyverse:latest
 
 RUN apt-get update -y\
 && apt-get install -y dpkg-dev zlib1g-dev libssl-dev libffi-dev zlib1g-dev libbz2-dev liblzma-dev build-essential libglpk40\
-&& apt-get install -y curl libcurl4-openssl-dev\
+&& apt-get install -y curl nano less libcurl4-openssl-dev libgsl-dev \
 && apt-get install -y git\
 && R -e "install.packages('BiocManager')"\
 && R -e "BiocManager::install('biomaRt')"\
@@ -29,7 +29,7 @@ RUN apt-get update -y\
 && R -e "BiocManager::install('limma')"\
 && R -e "install.packages('magrittr')"\
 && R -e "install.packages('mclust')"\
-&& R -e "devtools::install_github('GabrielHoffman/mvIC', repos=BiocManager::repositories())"\
+#&& R -e "devtools::install_github('GabrielHoffman/mvIC', repos=BiocManager::repositories())"\
 && R -e "install.packages('psych')"\
 && R -e "install.packages('quantreg')"\
 && R -e "install.packages('RColorBrewer')"\
@@ -40,11 +40,16 @@ RUN apt-get update -y\
 && R -e "BiocManager::install('sva')"\
 && R -e "install.packages('tidyverse')"\
 && R -e "install.packages('utils')"\
-&& R -e "devtools::install_github('GabrielHoffman/variancePartition')"\
+#&& R -e "devtools::install_github('GabrielHoffman/variancePartition')"\
 && R -e "install.packages('visNetwork')"\
-&& R -e "install.packages('WGCNA')" \
-&& R -e "devtools::install_github('Sage-Bionetworks/sageseqr' )" \
+&& R -e "install.packages('WGCNA')" 
+#&& R -e "devtools::install_github('Sage-Bionetworks/sageseqr' )" 
 
-run mkdir /home/jgockley/sageseqr \ 
+RUN R -e "install.packages('scales')"
+RUN R -e "devtools::install_github('GabrielHoffman/mvIC', repos=BiocManager::repositories())"\
+&& R -e "devtools::install_github('GabrielHoffman/variancePartition')"\
+&& R -e "devtools::install_github('Sage-Bionetworks/sageseqr' )"
+
+RUN mkdir -p /home/jgockley/sageseqr \ 
 && git clone https://github.com/Sage-Bionetworks/sageseqr.git /home/jgockley/sageseqr/
 
